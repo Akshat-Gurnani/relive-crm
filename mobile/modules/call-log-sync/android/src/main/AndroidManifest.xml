@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Calls the agent makes and receives on the phone are copied into the CRM. -->
+  <uses-permission android:name="android.permission.READ_CALL_LOG" />
+  <!-- Call recordings saved by the phone's own dialer (Samsung, Xiaomi, OnePlus and others). -->
+  <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+</manifest>

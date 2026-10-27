@@ -1,0 +1,1 @@
+{ "name": "capture-harness", "private": true, "type": "module", "devDependencies": { "pg": "8.12.0" } }

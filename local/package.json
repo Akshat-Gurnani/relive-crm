@@ -1,0 +1,11 @@
+{
+  "name": "relive-crm-local",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Docker-free local test stack: loads the schema into Postgres and serves a small Supabase-compatible gateway",
+  "dependencies": {
+    "pg": "^8.13.0",
+    "web-push": "^3.6.7"
+  }
+}

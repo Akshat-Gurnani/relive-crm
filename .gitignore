@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.vercel/
+*.tsbuildinfo
+*.log
+.env*
+!.env.example
+*.apk
+*.aab
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+.expo/
+.DS_Store
+*.tgz
+mobile/modules/*/android/build/
+.gradle/
