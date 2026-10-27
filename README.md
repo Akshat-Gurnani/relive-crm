@@ -43,3 +43,5 @@ Data lives in `~/.relive-crm-local`. This stack is for testing only; production 
 - Vercel project root directory: `web`. Framework: Next.js. Every push to `main` deploys to production.
 - Environment variables live in Vercel (Project, Settings, Environment Variables). Secrets such as the Meta, Gemini and Resend keys are stored in the database (Admin, Integrations), never in this repository.
 - Database changes: add a numbered file under `supabase/migrations` and apply it to the Supabase project before merging the code that needs it.
+
+Deployments from GitHub are live: a push to main builds the web app from the web folder on Vercel.
