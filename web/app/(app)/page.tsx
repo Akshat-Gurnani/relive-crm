@@ -28,21 +28,29 @@ export default async function Dashboard({ searchParams }: { searchParams: Search
   const staff = new Map(((staffRes.data ?? []) as Pick<Staff, "id" | "full_name">[]).map((x) => [x.id, x.full_name]));
   const stageCount = new Map(s.pipeline_by_stage.map((x) => [x.stage_id, x.leads]));
   const maxStage = Math.max(1, ...stages.map((st) => stageCount.get(st.id) ?? 0));
+  // hot / warm / cold per stage: Cratio's Hot, Warm and Cold stages were imported as Follow-up plus a temperature
+  const temps = new Map<string, Record<string, number>>();
+  for (const x of s.pipeline_temperature ?? []) temps.set(x.stage_id, { ...(temps.get(x.stage_id) ?? {}), [x.temperature ?? "none"]: x.leads });
 
   const t = s.totals;
+  // Contact metrics are measured only on leads that arrived in this CRM: imported Cratio leads keep just their last call.
+  const measured = t.native_leads ?? t.leads;
+  const imported = t.imported_leads ?? 0;
   const scope = profile.role === "agent" ? (reports.length ? "Your leads and the people under you" : "Your leads") : profile.role === "manager" ? "Your team's leads" : ["marketing", "viewer"].includes(profile.role) ? "Aggregates only, no personal details" : "All leads";
   const days = Math.round((+new Date(to) - +new Date(from)) / 86400000) + 1;
   // marketing and viewers see totals only; everyone else can open the leads behind a number
   const open = !["marketing", "viewer"].includes(profile.role);
   const list = (p: Record<string, string>) => (open ? `/leads?${new URLSearchParams({ ...p, from, to })}` : undefined);
   const tiles: { label: string; value: string; note: string; emoji: EmojiName; href?: string; tone?: string }[] = [
-    { label: "Contacted", value: pct(t.contacted, t.leads), note: `${t.contacted.toLocaleString("en-IN")} of ${t.leads.toLocaleString("en-IN")} new leads`, emoji: "call", href: list({ view: "contacted" }) },
-    { label: "Speed to first call", value: minutes(t.avg_minutes_to_first_contact), note: "average, contacted leads", emoji: "zap", href: list({ view: "contacted" }) },
+    { label: "Contacted", value: measured ? pct(t.contacted, measured) : "–", note: measured ? `${t.contacted.toLocaleString("en-IN")} of ${measured.toLocaleString("en-IN")} leads that arrived here` : "no new leads here yet", emoji: "call", href: list({ view: "contacted" }) },
+    { label: "Speed to first call", value: measured ? minutes(t.avg_minutes_to_first_contact) : "–", note: "average, leads that arrived here", emoji: "zap", href: list({ view: "contacted" }) },
     { label: "Converted", value: t.converted.toLocaleString("en-IN"), note: `${pct(t.converted, t.leads)} of new leads`, emoji: "party", href: list({ view: "converted" }) },
     ...(t.lost != null ? [{ label: "Lost", value: t.lost.toLocaleString("en-IN"), note: `${pct(t.lost, t.leads)} of new leads`, emoji: "cold" as EmojiName, href: list({ view: "lost" }) }] : []),
     ...(s.overdue_followups != null ? [{ label: "Overdue follow-ups", value: s.overdue_followups.toLocaleString("en-IN"), note: "open leads past due, any date", emoji: "clock" as EmojiName, href: open ? "/leads?view=overdue&sort=followup" : undefined, tone: s.overdue_followups > 0 ? "text-bad" : "" }] : []),
     ...(t.reenquiries != null ? [{ label: "Re-enquiries", value: t.reenquiries.toLocaleString("en-IN"), note: "repeat interest in period", emoji: "recycle" as EmojiName, href: list({ view: "reenquiry" }) }] : []),
   ];
+  const noProject = s.by_project.find((r) => !r.project_id)?.leads ?? 0;
+  const noProjectNote = noProject && s.no_project_event ? `${s.no_project_event.toLocaleString("en-IN")} of the ${noProject.toLocaleString("en-IN")} leads without a project came from the LPM event campaign, which covers many projects, so no single project applies.` : undefined;
   const openTotal = stages.filter((st) => st.kind === "open").reduce((n, st) => n + (stageCount.get(st.id) ?? 0), 0);
 
   return (
@@ -71,7 +79,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Search
             </div>
             <p className="mt-6 max-w-sm text-[13.5px] leading-relaxed text-ink/75">
               {t.leads === 0 ? "No leads arrived in this period." : <>
-                <b className="font-semibold">{pct(t.contacted, t.leads)}</b> got a first call{t.avg_minutes_to_first_contact != null && <>, on average after <b className="font-semibold">{minutes(t.avg_minutes_to_first_contact)}</b></>}.{" "}
+                {measured > 0 ? <><b className="font-semibold">{pct(t.contacted, measured)}</b> of the leads that arrived here got a first call{t.avg_minutes_to_first_contact != null && <>, on average after <b className="font-semibold">{minutes(t.avg_minutes_to_first_contact)}</b></>}.{" "}</> : <>Call speed cannot be measured yet for this period.{" "}</>}
                 <b className="font-semibold">{t.converted}</b> have booked so far.
               </>}
             </p>
@@ -99,33 +107,41 @@ export default async function Dashboard({ searchParams }: { searchParams: Search
                 return (
                   <Link href={profile.role === "marketing" || profile.role === "viewer" ? "#" : `/leads?stage=${st.id}`} key={st.id} className="-mx-2 grid grid-cols-[9.5rem_1fr_3rem] items-center gap-3 rounded-lg px-2 py-0.5 transition hover:bg-white/[.04]">
                     <div className={`truncate text-[12.5px] ${st.kind === "lost" ? "text-mute" : ""}`}>{st.name}</div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-white/[.06]"><div className={`bar h-2.5 rounded-full ${bar}`} style={{ width: `${Math.max(n ? 2 : 0, (n / maxStage) * 100)}%` }} /></div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-white/[.06]">
+                      {st.kind === "open" && temps.has(st.id) ? (
+                        <div className="bar flex h-2.5 overflow-hidden rounded-full" style={{ width: `${Math.max(n ? 2 : 0, (n / maxStage) * 100)}%` }} title={`${temps.get(st.id)?.hot ?? 0} hot, ${temps.get(st.id)?.warm ?? 0} warm, ${temps.get(st.id)?.cold ?? 0} cold`}>
+                          {([["hot", "bg-bad"], ["warm", "bg-warn"], ["cold", "bg-sky/60"], ["none", "bg-white/20"]] as const).map(([k, c]) => { const v = temps.get(st.id)?.[k] ?? 0; return v ? <span key={k} className={`block h-2.5 ${c}`} style={{ width: `${(v / n) * 100}%` }} /> : null; })}
+                        </div>
+                      ) : <div className={`bar h-2.5 rounded-full ${bar}`} style={{ width: `${Math.max(n ? 2 : 0, (n / maxStage) * 100)}%` }} />}
+                    </div>
                     <div className="figure text-right text-[14px]">{n.toLocaleString("en-IN")}</div>
                   </Link>
                 );
               })}
+              <p className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[12px] text-mute"><span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-bad" />Hot</span><span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-warn" />Warm</span><span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-sky/60" />Cold</span><span>Cratio&apos;s Hot, Warm and Cold stages are kept as the temperature inside Follow-up.</span></p>
             </div>
           </section>
 
           <div className="stagger grid gap-4 lg:col-span-5">
             <Bars title="By source" rows={s.by_source.map((r) => ({ name: r.source_id ? sources.get(r.source_id) ?? "Unknown" : "No source", href: list({ source: r.source_id ?? "none" }), ...r }))} />
-            <Bars title="By project" rows={s.by_project.map((r) => ({ name: r.project_id ? projects.get(r.project_id) ?? "Unknown" : "No project", href: list({ project: r.project_id ?? "none" }), ...r }))} />
+            <Bars title="By project" rows={s.by_project.map((r) => ({ name: r.project_id ? projects.get(r.project_id) ?? "Unknown" : "No project recorded", href: list({ project: r.project_id ?? "none" }), ...r }))} note={noProjectNote} />
           </div>
 
           {s.by_agent.length > 0 && (
             <section className="panel overflow-x-auto lg:col-span-12">
               <div className="panel-head"><h2 className="panel-title">By agent</h2><span className="text-[12px] text-mute">leads created in period</span></div>
               <table className="w-full">
-                <thead><tr><th className="th">Agent</th><th className="th text-right">Leads</th><th className="th">Contacted</th><th className="th text-right">Converted</th><th className="th text-right">Avg time to first call</th></tr></thead>
+                <thead><tr><th className="th">Agent</th><th className="th text-right">Leads</th><th className="th">Contacted (new here)</th><th className="th text-right">Converted</th><th className="th text-right">Avg time to first call</th></tr></thead>
                 <tbody>
                   {[...s.by_agent].sort((a, b) => b.leads - a.leads).map((a) => {
                     const nm = a.agent_id ? staff.get(a.agent_id) ?? "Unknown" : "Unassigned";
-                    const c = a.leads ? a.contacted / a.leads : 0;
+                    const base = a.native ?? a.leads;
+                    const c = base ? a.contacted / base : 0;
                     return (
                       <tr key={a.agent_id ?? "none"} className="row">
                         <td className="td"><Link href={list({ assignee: a.agent_id ?? "none" })!} className="flex items-center gap-2.5 hover:underline"><Avatar name={nm} size={24} />{nm}</Link></td>
                         <td className="td figure text-right text-[14px]">{a.leads}</td>
-                        <td className="td"><span className="flex items-center gap-2"><span className="h-1.5 w-28 rounded-full bg-white/[.06]"><span className={`bar block h-1.5 rounded-full ${c < 0.6 ? "bg-bad/80" : "bg-gradient-to-r from-sky/70 to-accent"}`} style={{ width: `${c * 100}%` }} /></span><span className="tabular-nums text-mute">{pct(a.contacted, a.leads)}</span></span></td>
+                        <td className="td"><span className="flex items-center gap-2"><span className="h-1.5 w-28 rounded-full bg-white/[.06]"><span className={`bar block h-1.5 rounded-full ${c < 0.6 ? "bg-bad/80" : "bg-gradient-to-r from-sky/70 to-accent"}`} style={{ width: `${c * 100}%` }} /></span><span className="tabular-nums text-mute">{base ? pct(a.contacted, base) : "n/a"}</span></span></td>
                         <td className="td figure text-right text-[14px]">{a.converted}</td>
                         <td className="td text-right tabular-nums">{minutes(a.avg_minutes)}</td>
                       </tr>
@@ -136,13 +152,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Search
             </section>
           )}
         </div>
+        {imported > 0 && <p className="text-[12px] text-mute">Contact speed counts only leads that arrived in this CRM. {imported.toLocaleString("en-IN")} of {t.leads.toLocaleString("en-IN")} leads in this period were imported from Cratio, which kept only each lead&apos;s last call, so they are left out of contacted % and speed until the full call history is imported.</p>}
         <p className="text-[12px] text-mute">Live from the database, not a cached snapshot.</p>
       </Page>
     </>
   );
 }
 
-function Bars({ title, rows }: { title: string; rows: { name: string; href?: string; leads: number; contacted: number; converted: number }[] }) {
+function Bars({ title, rows, note }: { title: string; rows: { name: string; href?: string; leads: number; contacted: number; converted: number }[]; note?: string }) {
   const sorted = [...rows].sort((a, b) => b.leads - a.leads);
   const max = Math.max(1, ...sorted.map((r) => r.leads));
   return (
@@ -159,6 +176,7 @@ function Bars({ title, rows }: { title: string; rows: { name: string; href?: str
           ))}
         </ul>
       )}
+      {note && <p className="px-4 pb-3 text-[12px] text-mute">{note}</p>}
     </section>
   );
 }

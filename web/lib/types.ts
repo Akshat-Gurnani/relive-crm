@@ -79,10 +79,12 @@ export type Template = { id: string; channel: "whatsapp" | "email" | "sms"; name
 
 export type DashboardStats = {
   role: Role;
-  totals: { leads: number; contacted: number; converted: number; lost?: number; reenquiries?: number; avg_minutes_to_first_contact: number | null };
+  totals: { leads: number; native_leads?: number; imported_leads?: number; contacted: number; converted: number; lost?: number; reenquiries?: number; avg_minutes_to_first_contact: number | null };
   pipeline_by_stage: { stage_id: string; leads: number }[];
+  pipeline_temperature?: { stage_id: string; temperature: "hot" | "warm" | "cold" | null; leads: number }[];
+  no_project_event?: number;
   by_source: { source_id: string | null; leads: number; contacted: number; converted: number }[];
   by_project: { project_id: string | null; leads: number; contacted: number; converted: number }[];
-  by_agent: { agent_id: string | null; leads: number; contacted: number; converted: number; avg_minutes: number | null }[];
+  by_agent: { agent_id: string | null; leads: number; native?: number; contacted: number; converted: number; avg_minutes: number | null }[];
   overdue_followups: number | null;
 };
