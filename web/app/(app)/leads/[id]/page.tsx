@@ -29,7 +29,7 @@ const FIELD: Record<string, string> = {
   next_followup_at: "Next follow-up", next_followup_note: "Follow-up note", lost_reason_id: "Lost reason", lost_remarks: "Lost remarks",
   description: "Description", budget_min: "Budget from", budget_max: "Budget up to", budget_band: "Budget", unit_size: "Size", location_pref: "Location",
   possession_pref: "Possession", property_type: "Property type", bhk: "BHK", qualification: "Qualification", lead_type: "Lead type", tags: "Tags",
-  interests: "Also interested in", attention: "Attention note", pool_rule_id: "Open pool", routing_rule_id: "Distribution rule", vendor_id: "Vendor",
+  interests: "Also interested in", attention: "Attention note", created_at: "Created", ad_id: "Ad", ad_name: "Ad", provider: "Channel", campaign_name: "Campaign", form_name: "Form", pool_rule_id: "Open pool", routing_rule_id: "Distribution rule", vendor_id: "Vendor",
 };
 
 const SELECT = "*, stage:stages(name,kind), project:projects(name), source:sources(name), vendor:vendors(name), person:people(*)";
@@ -154,7 +154,7 @@ export default async function LeadPage({ params, searchParams }: { params: Promi
     if (field === "project_id") return refs.projects.find((p) => p.id === v)?.name ?? "(inactive project)";
     if (field === "source_id") return refs.sources.find((s) => s.id === v)?.name ?? "(inactive source)";
     if (field === "lost_reason_id") return refs.reasons.find((r) => r.id === v)?.name ?? "?";
-    if (field === "next_followup_at") return dateTime(v);
+    if (field.endsWith("_at")) return dateTime(v);
     if (field === "pool_rule_id" || field === "routing_rule_id" || field === "vendor_id") return "set";
     if (v.startsWith("[")) { try { return (JSON.parse(v) as string[]).join(", ") || "empty"; } catch { return v; } }
     return v.length > 140 ? `${v.slice(0, 140)}…` : v;

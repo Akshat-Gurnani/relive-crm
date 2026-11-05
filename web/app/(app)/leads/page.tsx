@@ -41,7 +41,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     const s = p.toString();
     return s ? `/leads?${s}` : "/leads";
   };
-  const views: [string, string, EmojiName][] = [["all", "All", "house"], ["mine", "Mine", "wave"], ["open", "Open", "sparkles"], ["uncontacted", "Never contacted", "zap"], ["contacted", "Contacted", "call"], ["overdue", "Overdue", "clock"], ["reenquiry", "Re-enquired", "recycle"], ["converted", "Converted", "party"], ["lost", "Lost", "cold"], ...(manage ? [["unassigned", "Unassigned", "thinking"] as [string, string, EmojiName]] : [])];
+  const views: [string, string, EmojiName][] = [["all", "All", "house"], ["mine", "Mine", "wave"], ["pool", "Open to claim", "fire"], ["open", "Open", "sparkles"], ["uncontacted", "Never contacted", "zap"], ["contacted", "Contacted", "call"], ["overdue", "Overdue", "clock"], ["reenquiry", "Re-enquired", "recycle"], ["converted", "Converted", "party"], ["lost", "Lost", "cold"], ...(manage ? [["unassigned", "Unassigned", "thinking"] as [string, string, EmojiName]] : [])];
   const current = views.find(([k]) => k === view);
   const filtered = ["q", "stage", "project", "source", "assignee", "temp", "priority", "from", "to", "fu_from", "fu_to", "channel", "vendor", "campaign", "qual", "tag", "interest"].some((k) => one(sp[k]));
   const ret = `/leads${qsNow ? `?${qsNow}` : ""}${page > 1 ? `${qsNow ? "&" : "?"}page=${page}` : ""}`;
