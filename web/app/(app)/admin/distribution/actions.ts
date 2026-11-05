@@ -63,6 +63,38 @@ export async function deleteRule(formData: FormData) {
   back(error ? { error: error.message } : { notice: "Rule deleted. Leads already handed out stay where they are." });
 }
 
+// Open pool: every member of the rule is alerted and the first to call keeps the lead.
+export async function setClaimMode(formData: FormData) {
+  const { sb } = await admin();
+  const on = formData.get("claim_mode") === "on";
+  const { error } = await sb.from("routing_rules").update({ claim_mode: on, updated_at: new Date().toISOString() }).eq("id", String(formData.get("id")));
+  back(error ? { error: error.message } : { notice: on ? "Open pool on: new leads for this category go to everyone in the rule; the first to call keeps it." : "Open pool off: back to taking turns." });
+}
+
+// Who gets a lead nobody else can take, and how long an open-pool lead waits before normal turns take over.
+export async function saveFallback(formData: FormData) {
+  const { sb } = await admin();
+  const user = String(formData.get("user_id") ?? "").trim() || null;
+  const mins = Math.max(0, Math.min(1440, Number(String(formData.get("timeout_minutes") ?? "60")) || 0));
+  const now = new Date().toISOString();
+  const r1 = await sb.from("app_settings").upsert({ key: "fallback_owner", value: { user_id: user }, updated_at: now }, { onConflict: "key" });
+  if (r1.error) back({ error: r1.error.message });
+  const r2 = await sb.from("app_settings").upsert({ key: "pool", value: { timeout_minutes: mins }, updated_at: now }, { onConflict: "key" });
+  back(r2.error ? { error: r2.error.message } : { notice: "Saved." });
+}
+
+// Idle rotation: leads untouched for N days, or kept in Yet To Talk for M days, move to the next person in their rule.
+export async function saveIdle(formData: FormData) {
+  const { sb } = await admin();
+  const { data } = await sb.from("app_settings").select("value").eq("key", "rotation").single();
+  const cur = ((data?.value ?? {}) as Record<string, unknown>);
+  const n = (k: string, d: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Number(String(formData.get(k) ?? d)) || d));
+  const value = { ...cur, idle_enabled: formData.get("idle_enabled") === "on", idle_days: n("idle_days", 15, 2, 120), ytt_days: n("ytt_days", 5, 1, 60),
+                  followup_grace_days: n("followup_grace_days", 15, 0, 120), idle_max: n("idle_max", 10, 1, 50) };
+  const { error } = await sb.from("app_settings").update({ value, updated_at: new Date().toISOString() }).eq("key", "rotation");
+  back(error ? { error: error.message } : { notice: value.idle_enabled ? "Idle rotation is on. It moves up to 25 leads a minute during working hours." : "Idle rotation settings saved (switched off)." });
+}
+
 // "Untouched lead distribution": only the on/off switch and the minutes are changed here; the other rotation settings stay as they are.
 export async function saveUntouched(formData: FormData) {
   const { sb } = await admin();

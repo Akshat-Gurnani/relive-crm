@@ -20,17 +20,13 @@ const db = new pg.Client({ connectionString: dbUrl() });
 await db.connect();
 const steps = [
   ["local/bootstrap.sql", read("local", "bootstrap.sql")],
-  ["0001_core.sql", read("supabase", "migrations", "0001_core.sql")],
-  ["0002_dashboard.sql", read("supabase", "migrations", "0002_dashboard.sql")],
-  ["0003_workflows.sql", read("supabase", "migrations", "0003_workflows.sql")],
-  ["0004_hierarchy.sql", read("supabase", "migrations", "0004_hierarchy.sql")],
-  ["0005_integrations.sql", read("supabase", "migrations", "0005_integrations.sql")],
-  ["0007_cratio_import.sql", read("supabase", "migrations", "0007_cratio_import.sql")],
-  ["0008_import_owners.sql", read("supabase", "migrations", "0008_import_owners.sql")],
-  ["0009_lead_source_codes.sql", read("supabase", "migrations", "0009_lead_source_codes.sql")],
-  ["0010_lead_sources_as_in_cratio.sql", read("supabase", "migrations", "0010_lead_sources_as_in_cratio.sql")],
-  ["0011_lead_search.sql", read("supabase", "migrations", "0011_lead_search.sql")],
-  ["0012_insights.sql", read("supabase", "migrations", "0012_insights.sql")],
+  ["storage stand-in", "create schema if not exists storage; create table if not exists storage.buckets(id text primary key, name text, public boolean); create table if not exists storage.objects(id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);"],
+  // every migration in order; the Cratio rule seed at the end of 0024 needs the live projects and staff, so it is skipped here
+  ...fs.readdirSync(path.join(ROOT, "supabase", "migrations")).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort().map((f) => {
+    let sql = read("supabase", "migrations", f);
+    if (f.startsWith("0024_")) sql = sql.split("-- The 21 Cratio distribution rules")[0];
+    return [f, sql];
+  }),
   ["seed.sql", read("supabase", "seed.sql")],
   ...(demo ? [["local/seed_demo.sql", read("local", "seed_demo.sql")]] : []),
 ];
