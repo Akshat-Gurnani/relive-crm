@@ -30,6 +30,7 @@ export function applyLeadFilters<T>(query: T, sp: SP, ctx: { userId: string; ope
   if (fuFrom) q = q.gte("next_followup_at", ist(fuFrom));
   if (fuTo) q = q.lte("next_followup_at", ist(fuTo, true));
   if (view === "unassigned") q = q.is("assigned_to", null);
+  if (view === "pool") q = q.is("assigned_to", null).not("pool_rule_id", "is", null);
   if (view === "uncontacted") q = q.is("first_contacted_at", null).in("stage_id", ctx.openStageIds);
   if (view === "overdue") q = q.lt("next_followup_at", new Date().toISOString()).in("stage_id", ctx.openStageIds);
   if (view === "reenquiry") q = q.gt("reenquiry_count", 0);

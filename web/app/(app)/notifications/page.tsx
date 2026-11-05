@@ -5,7 +5,7 @@ import { PushToggle } from "@/components/push-toggle";
 import { markAllRead, saveAlertSettings } from "./actions";
 import { EMAIL_KINDS } from "@/lib/alerts";
 
-const ICON: Record<string, EmojiName> = { lead_assigned: "wave", lead_rotated: "recycle", followup_due: "clock", task_due: "bell", task_assigned: "check", reenquiry: "mailbox", lead_unassigned: "thinking", lead_new: "sparkles", lead_invalid: "zap", integration_failed: "zap" };
+const ICON: Record<string, EmojiName> = { lead_assigned: "wave", lead_rotated: "recycle", followup_due: "clock", task_due: "bell", task_assigned: "check", reenquiry: "mailbox", lead_unassigned: "thinking", lead_new: "sparkles", lead_invalid: "zap", integration_failed: "zap", lead_pool: "fire", lead_claimed: "handshake", lead_bounced: "thinking" };
 const DEFAULT_KINDS = ["lead_assigned", "lead_unassigned", "reenquiry", "lead_invalid"];
 
 export default async function Notifications() {

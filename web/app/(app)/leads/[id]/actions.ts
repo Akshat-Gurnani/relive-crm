@@ -98,19 +98,84 @@ export async function saveDetails(formData: FormData) {
   done(leadId, error?.message);
 }
 
+const VISIT_KINDS = ["site_visit", "meeting", "office_visit", "video_call"];
+const KIND_LABEL: Record<string, string> = { site_visit: "Site visit", meeting: "Meeting", office_visit: "Office visit", video_call: "Video call" };
+const visitsTab = (leadId: string, error?: string): never => {
+  revalidatePath(`/leads/${leadId}`);
+  redirect(`/leads/${leadId}?tab=visits${error ? `&error=${encodeURIComponent(error)}` : ""}`);
+};
+
+// Moves the lead forward to a visit stage, never backwards (a Booked or later lead stays where it is).
+async function advanceTo(sb: Awaited<ReturnType<typeof getStaff>>["sb"], leadId: string, stageName: string) {
+  const [{ data: target }, { data: lead }] = await Promise.all([
+    sb.from("stages").select("id,position").eq("name", stageName).maybeSingle(),
+    sb.from("leads").select("stage:stages(kind,position)").eq("id", leadId).single(),
+  ]);
+  const cur = (lead as unknown as { stage: { kind: string; position: number } | null } | null)?.stage;
+  if (!target || !cur || cur.kind !== "open" || cur.position >= target.position) return null;
+  const { error } = await sb.from("leads").update({ stage_id: target.id }).eq("id", leadId);
+  return error;
+}
+
 export async function scheduleVisit(formData: FormData) {
   const leadId = String(formData.get("lead_id"));
   const { sb } = await getStaff();
   const when = fromLocalInput(str(formData, "scheduled_at"));
-  if (!when) done(leadId, "Pick a date and time for the visit.");
+  if (!when) visitsTab(leadId, "Pick a date and time for the visit.");
+  const kind = VISIT_KINDS.includes(str(formData, "kind") ?? "") ? str(formData, "kind")! : "site_visit";
   const { data: lead } = await sb.from("leads").select("project_id").eq("id", leadId).single();
-  const { error } = await sb.from("site_visits").insert({ lead_id: leadId, project_id: lead?.project_id ?? null, scheduled_at: when, notes: str(formData, "notes") });
-  if (error) done(leadId, error.message);
-  const { data: stage } = await sb.from("stages").select("id").eq("name", "Site Visit Scheduled").maybeSingle();
-  const upd: Record<string, unknown> = { next_followup_at: when, next_followup_note: "Site visit" };
-  if (stage) upd.stage_id = stage.id;
-  const res = await sb.from("leads").update(upd).eq("id", leadId);
-  done(leadId, res.error?.message);
+  const { error } = await sb.from("site_visits").insert({ lead_id: leadId, project_id: lead?.project_id ?? null, scheduled_at: when, notes: str(formData, "notes"), kind, status: "planned" });
+  if (error) visitsTab(leadId, error.message);
+  const res = await sb.from("leads").update({ next_followup_at: when, next_followup_note: KIND_LABEL[kind] }).eq("id", leadId);
+  if (res.error) visitsTab(leadId, res.error.message);
+  if (kind === "site_visit") {
+    const e = await advanceTo(sb, leadId, "Site Visit Scheduled");
+    if (e) visitsTab(leadId, e.message);
+  }
+  visitsTab(leadId);
+}
+
+// A meeting or visit that already happened, logged in one go from the field.
+export async function logVisit(formData: FormData) {
+  const leadId = String(formData.get("lead_id"));
+  const { sb, profile } = await getStaff();
+  const at = fromLocalInput(str(formData, "done_at"));
+  if (!at) visitsTab(leadId, "When did it happen?");
+  if (new Date(at!) > new Date(Date.now() + 5 * 60_000)) visitsTab(leadId, "That time is in the future. Use \"Plan it\" for a visit that has not happened yet.");
+  const kind = VISIT_KINDS.includes(str(formData, "kind") ?? "") ? str(formData, "kind")! : "site_visit";
+  const { data: lead } = await sb.from("leads").select("project_id").eq("id", leadId).single();
+  const { error } = await sb.from("site_visits").insert({
+    lead_id: leadId, project_id: lead?.project_id ?? null, kind, status: "done", scheduled_at: at, done_at: at,
+    outcome: str(formData, "outcome"), feedback: str(formData, "feedback"), location: str(formData, "location"), accompanied_by: profile.id,
+  });
+  if (error) visitsTab(leadId, error.message);
+  const next = fromLocalInput(str(formData, "next_followup_at"));
+  if (next) {
+    const r = await sb.from("leads").update({ next_followup_at: next, next_followup_note: `After ${KIND_LABEL[kind].toLowerCase()}` }).eq("id", leadId);
+    if (r.error) visitsTab(leadId, r.error.message);
+  }
+  if (kind === "site_visit" && formData.get("move_stage") === "on") {
+    const e = await advanceTo(sb, leadId, "Site Visit Done");
+    if (e) visitsTab(leadId, e.message);
+  }
+  visitsTab(leadId);
+}
+
+// A planned visit: it happened, the customer did not come, or it was cancelled.
+export async function updateVisit(formData: FormData) {
+  const leadId = String(formData.get("lead_id"));
+  const visitId = String(formData.get("visit_id"));
+  const { sb, profile } = await getStaff();
+  const status = ["done", "no_show", "cancelled"].includes(str(formData, "status") ?? "") ? str(formData, "status")! : "done";
+  const patch: Record<string, unknown> = { status, outcome: str(formData, "outcome"), feedback: str(formData, "feedback") };
+  if (status === "done") { patch.done_at = new Date().toISOString(); patch.accompanied_by = profile.id; }
+  const { error } = await sb.from("site_visits").update(patch).eq("id", visitId);
+  if (error) visitsTab(leadId, error.message);
+  if (status === "done" && str(formData, "kind") === "site_visit") {
+    const e = await advanceTo(sb, leadId, "Site Visit Done");
+    if (e) visitsTab(leadId, e.message);
+  }
+  visitsTab(leadId);
 }
 
 export async function markVisitDone(formData: FormData) {

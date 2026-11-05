@@ -56,6 +56,7 @@ export type LeadDetail = LeadRow & {
   tags: string[];
   legacy: Record<string, string> | null;
   import_ref: string | null;
+  created_by: string | null; updated_at: string | null; pool_rule_id?: string | null;
 };
 
 export type Person = {
