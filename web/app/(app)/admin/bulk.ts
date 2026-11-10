@@ -93,3 +93,17 @@ export async function makeLinks(_: BulkState, fd: FormData): Promise<BulkState> 
   }
   return { mode: "links", lines, summary: `${lines.filter((l) => l.link).length} links made. Nothing was emailed.` };
 }
+
+// One-time set-password link for a person who already has a login (first sign-in or a forgotten password).
+// Nothing is emailed: the admin copies the link and sends it to that person.
+export async function staffLink(userId: string): Promise<{ link?: string; email?: string; error?: string }> {
+  const c = await ctx();
+  if ("error" in c) return { error: c.error };
+  const { data: u, error: e1 } = await c.svc.auth.admin.getUserById(userId);
+  const email = u?.user?.email;
+  if (e1 || !email) return { error: "This person has no login yet. Create one with \"Add many people at once\"." };
+  const { data, error } = await c.svc.auth.admin.generateLink({ type: "recovery", email });
+  const hash = data?.properties?.hashed_token;
+  if (error || !hash) return { error: error?.message ?? "Could not make a link." };
+  return { email, link: `${appUrl()}/auth/confirm?token_hash=${encodeURIComponent(hash)}&type=recovery&next=/set-password` };
+}

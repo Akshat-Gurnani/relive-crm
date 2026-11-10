@@ -5,6 +5,8 @@ import { dateOnly, one } from "@/lib/format";
 import type { Named, Role, Template } from "@/lib/types";
 import { Avatar, Emoji, Notice, Page, PageHeader } from "@/components/ui";
 import { BulkStaff } from "./bulk-staff";
+import { LoginLink } from "./login-link";
+import { service } from "@/lib/server/service";
 import { addListValue, addUser, deleteTemplate, linkImportOwner, saveRotation, saveTemplate, setStaffFlag, toggleListValue, updateStaff } from "./actions";
 
 type StaffRow = { id: string; full_name: string; phone: string | null; role: Role; team_id: string | null; manager_id: string | null; active: boolean; accepting_leads: boolean; last_assigned_at: string | null };
@@ -30,6 +32,17 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
     sb.from("message_templates").select("id,channel,name,subject,body,active").order("channel").order("name"),
   ]);
   const staff = (staffRes.data ?? []) as StaffRow[];
+  // Admins see whether each person has ever signed in (auth users are only readable with the service role).
+  const logins = new Map<string, { email: string | null; last: string | null }>();
+  if (isAdmin && tab === "staff") {
+    try {
+      for (let page = 1; page <= 5; page++) {
+        const { data } = await service().auth.admin.listUsers({ page, perPage: 1000 });
+        for (const u of data?.users ?? []) logins.set(u.id, { email: u.email ?? null, last: u.last_sign_in_at ?? null });
+        if ((data?.users.length ?? 0) < 1000) break;
+      }
+    } catch { /* no service key locally: the column just shows a dash */ }
+  }
   const teams = (teamsRes.data ?? []) as Named[];
   const teamName = new Map(teams.map((t) => [t.id, t.name]));
   const owners = (ownersRes.data ?? []) as { cratio_name: string; leads: number; waiting: number; linked_to: string | null }[];
@@ -57,7 +70,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
             <div className="panel-head"><h2 className="panel-title flex items-center gap-2"><Emoji name="handshake" size={15} />Staff</h2><span className="text-[12px] text-mute">{isAdmin ? "Change a row and press Save" : "Only admins can change staff"}</span></div>
             <p className="border-b border-line/10 px-4 py-2.5 text-[12.5px] text-mute">New leads go round robin to active agents who are accepting leads, within each form&apos;s team. Untouched leads move on as set under Lead rules.</p>
             <table className="w-full">
-              <thead><tr><th className="th">Name</th><th className="th">Role</th><th className="th">Team</th><th className="th">Reports to</th><th className="th">Phone</th><th className="th">Active</th><th className="th">Takes leads</th><th className="th text-right">Last lead</th><th className="th" /></tr></thead>
+              <thead><tr><th className="th">Name</th><th className="th">Role</th><th className="th">Team</th><th className="th">Reports to</th><th className="th">Phone</th><th className="th">Active</th><th className="th">Takes leads</th><th className="th text-right">Last lead</th>{isAdmin && <th className="th">Login</th>}<th className="th" /></tr></thead>
               <tbody>{staff.map((s) => (
                 <tr key={s.id} className="row">
                   <td className="td"><span className="flex items-center gap-2.5 font-medium"><Avatar name={s.full_name} size={26} />{s.full_name}</span></td>
@@ -72,6 +85,10 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
                   <td className="td"><Flag disabled={!isAdmin} id={s.id} field="active" on={s.active} /></td>
                   <td className="td">{s.role === "agent" ? <Flag disabled={!isAdmin} id={s.id} field="accepting_leads" on={s.accepting_leads} /> : <span className="text-faint">–</span>}</td>
                   <td className="td text-right text-mute">{dateOnly(s.last_assigned_at)}</td>
+                  {isAdmin && <td className="td"><div className="flex flex-col items-start gap-1">
+                    <span className={`text-[11.5px] ${logins.get(s.id)?.last ? "text-mute" : "text-warn"}`}>{!logins.has(s.id) ? "–" : logins.get(s.id)?.last ? `Signed in ${dateOnly(logins.get(s.id)?.last ?? null)}` : "Never signed in"}</span>
+                    {logins.has(s.id) && <LoginLink id={s.id} name={s.full_name} />}
+                  </div></td>}
                   <td className="td">{isAdmin && <form id={`st-${s.id}`} action={updateStaff}><input type="hidden" name="id" value={s.id} /><button className="btn-quiet h-8" type="submit">Save</button></form>}</td>
                 </tr>
               ))}</tbody>
