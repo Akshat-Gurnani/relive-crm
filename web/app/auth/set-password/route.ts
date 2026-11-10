@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { error } = await sb.auth.updateUser({ password: pw });
   // "same_password" means this exact password is already saved (usually a second tap): treat it as done.
   if (error && error.code !== "same_password") return go(req, "/set-password", "failed");
-  return go(req, "/");
+  return go(req, "/welcome");
 }
 
 function go(req: NextRequest, path: string, error?: string) {

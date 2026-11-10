@@ -11,6 +11,7 @@ import { ensureBackgroundSync } from "../lib/background";
 import { registerPush } from "../lib/push";
 import { checkAlerts, startLiveAlerts } from "../lib/alerts";
 import { C } from "../lib/theme";
+import { UpdatePrompt } from "../components/update-prompt";
 
 function Gate() {
   const { ready, profile, offline, refresh, forget } = useSession();
@@ -77,6 +78,7 @@ export default function RootLayout() {
     <SessionProvider>
       <StatusBar style="light" />
       <Gate />
+      <UpdatePrompt />
     </SessionProvider>
   );
 }

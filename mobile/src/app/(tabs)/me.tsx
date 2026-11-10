@@ -8,9 +8,11 @@ import { registerPush } from "../../lib/push";
 import { getServer } from "../../lib/supabase";
 import { dateTime } from "../../lib/format";
 import { C } from "../../lib/theme";
+import { currentVersionName, requestUpdateCheck } from "../../lib/updates";
 
 export default function Me() {
   const { profile, signOut } = useSession();
+  const [upd, setUpd] = useState<"checking" | "found" | "latest" | null>(null);
   const [perm, setPerm] = useState({ calls: false, audio: false });
   const [last, setLast] = useState(0);
   const [msg, setMsg] = useState("");
@@ -56,6 +58,12 @@ export default function Me() {
         <Card style={{ gap: 6 }}>
           <T v="eyebrow">Server</T>
           <T v="small">{server}</T>
+        </Card>
+        <Card style={{ gap: 6 }}>
+          <T v="eyebrow">App version</T>
+          <T v="small">Relive CRM {currentVersionName()}</T>
+          <Button title={upd === "checking" ? "Checking…" : "Check for updates"} kind="quiet" onPress={async () => { setUpd("checking"); setUpd((await requestUpdateCheck()) ? "found" : "latest"); }} />
+          {upd === "latest" ? <T v="small" style={{ color: C.won }}>You have the latest version.</T> : null}
         </Card>
         <Button title="Sign out" kind="danger" onPress={signOut} />
       </ScrollView>

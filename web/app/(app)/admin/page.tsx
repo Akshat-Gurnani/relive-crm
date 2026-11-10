@@ -61,7 +61,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
         <span className="text-[12.5px] text-mute"><span className="figure text-[15px] text-ink">{staff.filter((s) => s.role === "agent" && s.active && s.accepting_leads).length}</span> agents taking leads</span>
       </PageHeader>
       <Page>
-        <div className="flex flex-wrap gap-1.5">{tabs.map(([k, l]) => <Link key={k} href={`/admin?tab=${k}`} className="chip" aria-current={tab === k ? "true" : undefined}>{l}</Link>)}{isAdmin && <Link href="/admin/distribution" className="chip">Distribution rules →</Link>}{isAdmin && <Link href="/admin/forms" className="chip">Facebook form mapping →</Link>}{isAdmin && <Link href="/admin/routing" className="chip">Advanced routing →</Link>}{isAdmin && <Link href="/admin/integrations" className="chip">Integrations →</Link>}</div>
+        <div className="flex flex-wrap gap-1.5">{tabs.map(([k, l]) => <Link key={k} href={`/admin?tab=${k}`} className="chip" aria-current={tab === k ? "true" : undefined}>{l}</Link>)}{isAdmin && <Link href="/admin/distribution" className="chip">Distribution rules →</Link>}{isAdmin && <Link href="/admin/forms" className="chip">Facebook form mapping →</Link>}{isAdmin && <Link href="/admin/routing" className="chip">Advanced routing →</Link>}{isAdmin && <Link href="/admin/integrations" className="chip">Integrations →</Link>}{isAdmin && <Link href="/admin/app" className="chip">Phone app →</Link>}</div>
         {one(sp.error) && <Notice>{one(sp.error)}</Notice>}
         {one(sp.notice) && <Notice tone="ok">{one(sp.notice)}</Notice>}
 

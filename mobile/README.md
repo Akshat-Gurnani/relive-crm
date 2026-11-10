@@ -33,6 +33,24 @@ The Android app is installed directly as an APK, not through the Play Store. Goo
 
 On first open, go to **Me** and tap **Allow call log access**. Allow audio files too if you want recordings.
 
+## Updates (no more sending APK files)
+
+The Android app updates itself. To ship a new version:
+
+1. Bump `version` and `android.versionCode` in `app.json` (the code must go up by at least 1).
+2. Build the release APK, signed with the Relive key (see below). Name it `relive-crm-VERSION-CODE.apk`, for example `relive-crm-1.2.0-3.apk`.
+3. In the web CRM go to **Admin → Phone app**, pick the file, add "What's new", and press **Upload and publish**.
+
+Every phone checks when the app opens or comes back to the front. If a newer version is published it shows **Update available**, downloads it, and opens Android's Install screen. The person taps Install once; their sign-in and data stay. Tick **Must install** for a required update (no "Later" button). **Withdraw** a bad build and phones are offered the previous one instead. New staff download the current version from `/download/android` (also linked on the page shown after they set their password).
+
+Android never lets an app installed outside the Play Store update without that one Install tap.
+
+## Signing key (keep it safe)
+
+Release builds are signed with the private Relive key, not React Native's public debug key. `plugins/with-relive-signing.js` reads `keystore.properties` from `RELIVE_KEYSTORE_PROPS` (default `/home/claude/relive-signing/keystore.properties`) and refuses to build a release without it. The key is **not** in git. Backup on the Mac: `Documents/CRM Re-Design/relive-android-signing/`. If the key is lost, no update can install over the existing app, and every phone has to uninstall and reinstall.
+
+The very first APK (1.0.0, October 2026) was signed with the public debug key. Anyone who installed it must uninstall it once and install 1.1.0 or later.
+
 ## iPhone
 
 iPhones need an Apple Developer account (USD 99 a year) to install an app outside Expo Go.
